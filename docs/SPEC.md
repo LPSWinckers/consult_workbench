@@ -2,7 +2,7 @@
 
 ## Agreed scope
 
-One consulting company, 1–8 pilot users, Dutch interface and Dutch document assistance, sample data. Frontend: Next.js. Backend: Python. AI provider: OpenAI API. The company has Microsoft 365 and SharePoint, but development currently happens on a personal PC without Office access.
+One consulting company, 1–8 pilot users, Dutch interface and Dutch document assistance, sample data. Frontend: Next.js. Backend: Python. AI provider: local Codex CLI for this prototype. The company has Microsoft 365 and SharePoint. Native Office editing can be enabled when running on the licensed Windows work PC.
 
 The company is fictional Meridian Consulting. It has a sample visual identity and configurable name, document colors, font, tagline and folder template.
 
@@ -71,7 +71,7 @@ Project chat uses the project context. File chat uses customer/project details a
 
 Context is bounded for the small PoC: at most 70,000 characters of project context, up to 14,000 characters from each file, and up to 40,000 extra characters from the editing target. Truncation is disclosed on context sources. This is direct text extraction, not a vector search service. Spreadsheet context includes cell coordinates and formulas; extracted slide text excludes embedded images, charts and diagrams.
 
-Without a configured key, demo mode returns explicit offline examples. It never claims a real spelling review happened. With a key, OpenAI errors surface as errors, with no silent demo fallback.
+Administrators persist separate chat and document/review models, reasoning effort and provider selection. Codex uses the host login and only receives authorized context. Offline examples require explicit provider=demo selection and never claim a real spelling review happened. Codex errors surface as errors without silent demo fallback.
 
 ## Document tools
 
@@ -81,8 +81,8 @@ Editing uses indexed paragraph replacements for Word, slide/text-shape replaceme
 
 An AI proposal is private to its creator. Apply checks that target and recorded context versions remain current, then writes a new version in a transaction. Repeated Apply is rejected. Generated files can be downloaded as concepts before saving.
 
-Charts use labels in Excel column A and numeric values in column B, with a header row. Up to 50 points from the first 200 displayed rows are supported. Interactive chart details work in the browser. PNG exports can be embedded into generated Word, PowerPoint and Excel files. Source workbook, sheet, range and version are recorded. Formula-derived values are not calculated locally.
+Charts use selectable label and numeric columns and a selectable worksheet, with a header row. Columns A/B on the first sheet are the default. Up to 50 points from the first 200 displayed rows are supported. Interactive chart details work in the browser. PNG exports can be embedded into generated Word, PowerPoint and Excel files. Source workbook, sheet, range and version are recorded. Formula-derived values are not calculated locally.
 
 ## Explicit boundaries
 
-Full manual Office functionality belongs to the later Office integration. Current previews are content views. SharePoint sync, Office add-in deployment, customer-level reference uploads, arbitrary chart-range selection, user-supplied PowerPoint masters, custom agent workflow builders and interactive objects inside Office files remain roadmap items.
+Full manual Office functionality is available through the optional desktop workflow: create a user-specific working copy, open native Office, save/close, then import validated bytes as a new version. Import checks current access and base version; conflicts preserve the working copy. Current previews are content views. SharePoint sync, Office add-in deployment, customer-level reference uploads, arbitrary chart-range selection beyond displayed rows, user-supplied PowerPoint masters, custom agent workflow builders and interactive objects inside Office files remain roadmap items.

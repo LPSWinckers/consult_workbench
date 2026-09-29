@@ -11,6 +11,26 @@
   --white: #fff;
   --radius: 13px;
 }
+
+.office-controls,
+.chart-selector {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--line);
+}
+.chart-selector {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.chart-selector p {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+@media (max-width: 600px) {
+  .chart-selector {
+    grid-template-columns: 1fr;
+  }
+}
 * {
   box-sizing: border-box;
 }

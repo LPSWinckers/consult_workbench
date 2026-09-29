@@ -1,5 +1,6 @@
 import os
-from openai import OpenAI
+import json
+from . import codex
 from pydantic import BaseModel, Field
 
 
@@ -13,9 +14,9 @@ class Section(BaseModel):
 
 
 class Slide(BaseModel):
-    title: str
-    body: str
-    notes: str
+    title: str = Field(max_length=100)
+    body: str = Field(max_length=650)
+    notes: str = Field(max_length=3000)
 
 
 class Edit(BaseModel):
@@ -46,45 +47,53 @@ Voer geen code uit. Je voorstellen worden door de gebruiker beoordeeld voordat z
 
 
 def answer(question, context, history, instructions=""):
-    key = os.getenv("OPENAI_API_KEY")
-    if not key:
+    if codex.configuration()["provider"] == "demo":
         if not demo_mode():
-            raise ValueError("Configureer OPENAI_API_KEY op de backend om AI te gebruiken")
+            raise ValueError("Schakel Codex in via de beheerinstellingen")
         return (
             "Voorbeeldantwoord · offline demonstratie\n\n"
             "De beschikbare projectcontext is hieronder samengevat. Er is geen AI-model aangeroepen.\n\n"
-            + context[:2400]
-            + "\n\nConfigureer OPENAI_API_KEY voor echte analyse en antwoorden."
+            + context.partition("\nBestand:")[0]
+            + "\nBeschikbare bestanden: "
+            + ", ".join(
+                line.removeprefix("Bestand: ")
+                for line in context.splitlines()
+                if line.startswith("Bestand: ")
+            )
+            + "\n\nSchakel Codex in via de beheerinstellingen voor echte analyse."
         )
-    client = OpenAI(api_key=key, timeout=90, max_retries=1)
-    result = client.responses.create(
-        model=os.getenv("OPENAI_MODEL", "gpt-6.1-sol"),
-        store=False,
-        instructions=SYSTEM + "\nAgentinstructies: " + instructions,
-        input=[{"role": "user", "content": "Projectcontext:\n" + context}]
-        + history
-        + [{"role": "user", "content": question}],
-        max_output_tokens=4000,
-    )
-    return result.output_text
+    payload = {"context": context, "history": history, "question": question}
+    return codex.generate(
+        SYSTEM
+        + "\nAgentinstructies: "
+        + instructions
+        + "\nBeantwoord de vraag in het answer-veld. Gegevens:\n"
+        + json.dumps(payload, ensure_ascii=False),
+        codex.Answer,
+    ).answer
 
 
 def propose(prompt, context, kind, editing=False, instructions=""):
-    key = os.getenv("OPENAI_API_KEY")
-    if not key:
+    if codex.configuration()["provider"] == "demo":
         if not demo_mode():
-            raise ValueError("Configureer OPENAI_API_KEY op de backend om AI te gebruiken")
+            raise ValueError("Schakel Codex in via de beheerinstellingen")
         if editing:
             return {
                 "title": "Voorbeeldreview",
-                "summary": "Offline demonstratie. Geen taalcontrole uitgevoerd en geen wijzigingen voorgesteld. Configureer een API-sleutel voor echte correcties.",
+                "summary": "Offline demonstratie. Geen taalcontrole uitgevoerd en geen wijzigingen voorgesteld. Schakel Codex in voor echte correcties.",
                 "edits": [],
             }
-        return {
+        project_summary = context.partition("\nBestand:")[0].strip()
+        slide_summary = "\n".join(
+            line
+            for line in project_summary.splitlines()
+            if line.startswith(("Klant:", "Project:", "Doelen:"))
+        )[:600]
+        draft = {
             "title": "Projectadvies",
             "summary": "Voorbeelddocument met sample-inhoud. Geen AI-model aangeroepen.",
             "sections": [
-                {"heading": "Projectcontext", "body": context[:1600]},
+                {"heading": "Projectcontext", "body": project_summary},
                 {
                     "heading": "Aanpak",
                     "body": "Inventariseer processen, voer een pilot uit en evalueer de resultaten.",
@@ -98,7 +107,7 @@ def propose(prompt, context, kind, editing=False, instructions=""):
                 },
                 {
                     "title": "Projectcontext",
-                    "body": context[:700],
+                    "body": slide_summary,
                     "notes": "Bespreek de uitgangspunten",
                 },
                 {
@@ -114,6 +123,10 @@ def propose(prompt, context, kind, editing=False, instructions=""):
             ],
             "edits": [],
         }
+        for field, output_kind in {"sections": "docx", "slides": "pptx", "rows": "xlsx"}.items():
+            if kind != output_kind:
+                draft[field] = []
+        return draft
     task = (
         "Geef gerichte edits van het bestaande bestand met de exacte indices uit de context. "
         "Word: paragraph,text; PowerPoint: slide,shape,text; Excel: sheet,cell,value. "
@@ -121,17 +134,13 @@ def propose(prompt, context, kind, editing=False, instructions=""):
         if editing
         else f"Maak een nieuw {kind}-document. Voor docx vul sections in, voor pptx slides en notes, voor xlsx rows. Laat edits leeg."
     )
-    client = OpenAI(api_key=key, timeout=120, max_retries=1)
-    result = client.responses.parse(
-        model=os.getenv("OPENAI_COMPLEX_MODEL", "gpt-6-astra"),
-        store=False,
-        instructions=SYSTEM + task + "\nAgentinstructies: " + instructions,
-        input="Context:\n" + context + "\nOpdracht:\n" + prompt,
-        text_format=Draft,
-        max_output_tokens=8000,
-    )
-    if result.output_parsed is None:
-        raise ValueError(
-            "Het model kon geen bewerkbaar voorstel leveren. Probeer de opdracht te verduidelijken."
-        )
-    return result.output_parsed.model_dump()
+    return codex.generate(
+        SYSTEM
+        + task
+        + "\nAgentinstructies: "
+        + instructions
+        + "\nGegevens:\n"
+        + json.dumps({"context": context, "task": prompt}, ensure_ascii=False),
+        Draft,
+        document=True,
+    ).model_dump()

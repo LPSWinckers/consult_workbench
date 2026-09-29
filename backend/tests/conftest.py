@@ -7,6 +7,7 @@ import pytest
 TEST_DIR = tempfile.TemporaryDirectory(prefix="meridian-tests-")
 os.environ["DATA_DIR"] = TEST_DIR.name
 os.environ["DEMO_MODE"] = "true"
+os.environ["AI_PROVIDER"] = "demo"
 os.environ["SEED_DEMO"] = "true"
 os.environ.pop("OPENAI_API_KEY", None)
 

@@ -13,11 +13,13 @@
 - Content previews for Word, Excel and PowerPoint.
 - Structured document generation and review/apply workflow.
 - Company colors/fonts/tagline applied to generated presentations.
-- Interactive Excel-derived bar charts, PNG export and chart insertion into generated Office files.
+- Interactive Excel-derived bar charts, sheet/column selection, PNG export and chart insertion into generated Office files.
+- Admin-configurable Codex chat/document models and explicit offline provider.
+- Native Office working copies, exact-byte version imports and conflict recovery downloads.
 
 ## Needs a configured service to validate
 
-Real OpenAI requests require an API key and model access. The initial automated suite uses demo mode and a mocked structured edit proposal, without network calls or charges. Run actual chat, Dutch review and all three document-generation cases after setting the key.
+Live Codex requests were checked using the host login: file-scoped question with a known answer, Word/PowerPoint/Excel generation and Apply, and Dutch spelling corrections through indexed edits. Admin model settings and connection testing are implemented. The ordinary automated suite uses explicit offline mode and never calls Codex. Other models require separate account-access and quality checks.
 
 Real email verification and recovery require SMTP. Development links are intended only for local sample accounts. Configured SMTP paths need a delivery check against a test inbox.
 
@@ -34,14 +36,14 @@ Native Office visual fidelity and formula behavior need validation in Word, Powe
 7. Verify selected-text/range/slide operations supported by each Office API and client version.
 8. Prove the full open, context, edit, save and sync path in all three applications.
 
-This phase needs real tenant and Office access. The current UI marks Microsoft integration as planned and does not present a fake connection button.
+This phase needs real tenant and Office access. The current UI exposes optional desktop Office editing and marks SharePoint as requiring tenant configuration. It does not present a fake SharePoint connection.
 
 ## Product extensions
 
 - Customer-level reference file library shared across explicitly authorized projects.
 - Uploaded PowerPoint master templates, company logo assets and better slide layout choices.
 - Agent editing, reusable company agents and a workflow builder.
-- Spreadsheet sheet/range/column selection for charts and reliable formula recalculation.
+- Chart ranges beyond the bounded content preview and reliable formula recalculation. Sheet/column selection is implemented.
 - Interactive content add-ins for Excel and PowerPoint; static fallback for exports and Word.
 - Rich document diff, per-correction acceptance and higher-fidelity preview rendering.
 - Team-chat attachments, mentions and real-time delivery.
@@ -50,6 +52,6 @@ This phase needs real tenant and Office access. The current UI marks Microsoft i
 
 ## Before using real customer data or hosting publicly
 
-Introduce proper database migrations, a production database, encrypted storage and backups, company-only registration, persistent rate limiting, HTTPS cookies, centralized session management, file malware scanning, access/audit monitoring, retention policies and queued AI jobs. Review OpenAI data handling and the company's confidentiality requirements with the actual deployment configuration.
+Introduce proper database migrations, a production database, encrypted storage and backups, company-only registration, persistent rate limiting, HTTPS cookies, centralized session management, file malware scanning, access/audit monitoring, retention policies and queued AI jobs. Review Codex account and data handling and the company's confidentiality requirements with the actual deployment configuration.
 
 These are deployment tasks. They are not prerequisites for trying the local sample-data demo.

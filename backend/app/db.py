@@ -84,6 +84,10 @@ def initialize():
           user_id TEXT REFERENCES users(id), file_id TEXT REFERENCES files(id), base_version INTEGER,
           name TEXT, payload TEXT, applied INTEGER DEFAULT 0, created_at TEXT);
         CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT);
+        CREATE TABLE IF NOT EXISTS office_checkouts(
+          id TEXT PRIMARY KEY, file_id TEXT REFERENCES files(id), user_id TEXT REFERENCES users(id),
+          base_version INTEGER NOT NULL, name TEXT NOT NULL, digest TEXT NOT NULL,
+          UNIQUE(file_id,user_id));
         """)
         c.execute(
             "INSERT OR IGNORE INTO settings VALUES('company', ?)",

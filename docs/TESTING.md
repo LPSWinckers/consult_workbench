@@ -8,7 +8,7 @@ Run from the repository root:
 ./.venv/Scripts/python.exe -m pytest -q
 ```
 
-The backend tests create a separate temporary data directory and remove the OpenAI key from their environment. They never modify the working demo database or call a paid API.
+The backend tests create a separate temporary data directory and select the offline AI provider in their environment. They never modify the working demo database or call Codex.
 
 Workflow coverage includes unauthorized project/file/AI access, customer read versus edit permissions, owner/admin state changes and audit records, pending invitations, one approval, membership removal, private conversation isolation, sharing, folder cycles, ZIP structure, trash restore, immutable versions, all three generated Office packages, stale edit rejection, agent limits, chart export and insertion, email verification, password reset, session revocation, origin checks and preserving the last administrator.
 
@@ -37,12 +37,16 @@ Use `npm run format` to apply the shared formatter. The backend uses Ruff format
 - Rename/move a folder, delete/restore it, and inspect the downloaded ZIP.
 - Check desktop and narrow screen widths for overflow and reachable actions.
 
-## Live OpenAI check
+## Opt-in live Codex check
 
-After configuring an API key, confirm settings show OpenAI configured. Ask a fact question with a known answer in `Projectbrief.docx`, then ask a follow-up. Test a file-scoped question to ensure other file contents are excluded. Run Dutch language review on a deliberately misspelled sample document, inspect the proposed corrections and apply them. Generate Word, Excel and PowerPoint drafts and inspect them in Office when available.
+```powershell
+./.venv/Scripts/python.exe scripts/smoke-codex.py
+```
 
-Record the model, prompts, source versions and observed outcomes. Availability or language quality cannot be established by the offline test suite.
+This uses the host Codex login, consumes usage and creates its entire sample workspace in a temporary directory. It verifies a known-answer file-scoped chat, native package generation and Apply for all three types, and Dutch correction edits. It never writes to the working database. For another model, change the model environment defaults before running it.
 
-## Initial verification record
+## Verification record, 29 September 2026
 
-Next.js production build and TypeScript checks passed. All 16 backend workflow tests passed, including file-scoped chat history, all three targeted Office edit types, folder ZIP downloads and source-version conflicts. Browser checks exercised login, project navigation, Excel content preview and interactive chart generation. Live OpenAI, SMTP and Microsoft 365 checks remain pending service credentials and company access.
+The backend suite has 22 passing tests. New coverage verifies admin-only persistent model settings, separate Codex model routing, subprocess restrictions, sheet/column chart selection and native-byte Office imports for all three types, immutable versions and stale checkout conflicts. Desktop launches are mocked in those tests. Live checks passed with Codex CLI 0.159.0 and `gpt-6.1-sol` at high reasoning effort for scoped chat, DOCX/PPTX/XLSX generation/Apply and Dutch correction edits.
+
+TypeScript, Prettier, Ruff and the Next.js production build passed. Windows helper start/stop/restart was verified with healthy services. Browser checks exercised the administrator settings, model fields, successful real Codex connection check and the worksheet/column chart controls without page or modal overflow at the tested desktop width. Earlier checks exercised login, project navigation, Excel preview, charts and document Apply. Actual native Office applications, SMTP delivery and SharePoint remain work-PC/company acceptance checks. The content/package tests do not prove Office visual fidelity.

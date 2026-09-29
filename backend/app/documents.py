@@ -163,9 +163,18 @@ def generate(payload, company, chart=None):
             )
             slide.notes_slide.notes_text_frame.text = item.get("notes", "")
         if chart:
-            slide = prs.slides.add_slide(prs.slide_layouts[5])
-            slide.shapes.title.text = "Data-analyse"
-            slide.shapes.add_picture(io.BytesIO(chart), Inches(1.4), Inches(1.5), width=Inches(10))
+            slide = prs.slides.add_slide(prs.slide_layouts[6])
+            slide.background.fill.solid()
+            slide.background.fill.fore_color.rgb = RGBColor.from_string(
+                company["primary"].lstrip("#")
+            )
+            textbox(0.65, 0.4, 11, 0.4, company["name"].upper(), 12, company["accent"], True)
+            textbox(0.65, 1, 12, 0.65, "Data-analyse", 30, "FFFFFF", True)
+            slide.shapes.add_picture(io.BytesIO(chart), Inches(1.6), Inches(1.85), width=Inches(10))
+            textbox(0.65, 7, 11, 0.3, company["tagline"], 10, company["accent"])
+            slide.notes_slide.notes_text_frame.text = (
+                "Grafiek uit de geselecteerde Excel-bron. Zie de bronverwijzing in de grafiektitel."
+            )
         prs.save(out)
     elif ext == "xlsx":
         wb = Workbook()

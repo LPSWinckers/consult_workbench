@@ -8,7 +8,7 @@ Browser
      -> /api proxy -> FastAPI :8000
         -> authorization -> SQLite metadata
         -> LocalStorage -> immutable Office blobs
-        -> context extraction -> OpenAI Responses API
+        -> context extraction -> ephemeral Codex CLI
         -> structured proposal -> document writer -> new version
 ```
 
@@ -28,7 +28,7 @@ The browser sends an HttpOnly session cookie to the same origin. Next.js proxies
 | `backend/app/db.py`             | SQLite schema, transactions, IDs, password hashing, timestamps and audit events                |
 | `backend/app/storage.py`        | Storage protocol and local immutable blob adapter                                              |
 | `backend/app/documents.py`      | Office validation, extraction, generation, targeted edits and PNG charts                       |
-| `backend/app/ai.py`             | OpenAI adapter, structured draft schema and labelled demo mode                                 |
+| `backend/app/ai.py`             | Structured draft schema and explicitly selected demo mode                                 |
 
 The API is synchronous for AI processing in this pilot. FastAPI runs synchronous handlers in its thread pool. Production deployment should move generation and indexing into a job queue.
 
@@ -50,7 +50,7 @@ Local demo mode exposes development verification/reset links intentionally. SMTP
 
 ## AI and document changes
 
-The backend owns the API key. Requests use `store=False`. Both model names are configurable. A model proposes data, not executable scripts. Pydantic structured outputs describe headings, paragraphs, slide text, notes, tabular rows and targeted edits. Native Python libraries perform those operations.
+The backend uses the host Codex login through a native subprocess. Both model names and reasoning effort are persisted in admin settings. `codex.py` restricts tools, requests schema-constrained output and validates it. See `CODEX.md` for the process boundary. A model proposes data, not executable scripts. Pydantic structured outputs describe headings, paragraphs, slide text, notes, tabular rows and targeted edits. Native Python libraries perform those operations.
 
 Permissions are checked before context assembly and again after the external AI call. A file-specific question narrows context to one file. Agent reference limits are intersected with that choice. Model-supplied text never grants access to another resource.
 
@@ -62,4 +62,8 @@ Run the backend and inspect `/docs` or `/openapi.json` for the current route def
 
 ## Personal-PC tradeoffs
 
-Local storage and SQLite avoid external infrastructure for the sample-data pilot. There is no SharePoint connection, embedded Office editor or Office add-in in this implementation. The client does not calculate spreadsheet formulas or render Office layouts. Its previews are designed to inspect content and support AI review.
+Local storage and SQLite avoid external infrastructure for the sample-data pilot. There is no SharePoint connection, embedded Office editor or Office add-in. Optional native desktop editing is implemented through personal checkouts and conflict-checked version imports. See `WORK_PC.md`. The client does not calculate spreadsheet formulas or render Office layouts. Its previews are designed to inspect content and support AI review.
+
+## Desktop working copies
+
+An additive `CREATE TABLE IF NOT EXISTS office_checkouts` migration stores checkout IDs, owner, file ID, base version, filename and digest. Paths are derived from server-generated IDs below `data/office`; clients cannot choose a host path. Office saves are read as a bounded snapshot, validated, then imported under `BEGIN IMMEDIATE`. The bytes are preserved without a Python re-save. Checkout baselines advance after import; conflicts retain copies for manual reconciliation.

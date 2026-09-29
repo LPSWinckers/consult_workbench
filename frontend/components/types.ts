@@ -74,9 +74,14 @@ export type Settings = {
   ai_mode: string;
   storage: string;
   microsoft_connected: boolean;
+  office_desktop_enabled: boolean;
+  ai: { provider: string; chat_model: string; document_model: string; reasoning_effort: string };
+  models: string[];
 };
 export type Source = { id: string; name: string; version: number; truncated?: boolean };
 export type ChartData = {
+  label_column: number;
+  value_column: number;
   file_id: string;
   project_id: string;
   version: number;

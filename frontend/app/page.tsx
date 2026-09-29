@@ -30,6 +30,7 @@ import {
   Bell,
   RefreshCw,
 } from "lucide-react";
+import { AISettings } from "../components/ai-settings";
 import { Auth } from "../components/auth";
 import { api, Avatar, Badge, Busy, Empty, Field, Modal, date } from "../components/ui";
 import { FilesPanel } from "../components/files";
@@ -1240,20 +1241,29 @@ export default function Home() {
                   )}
                 </section>
                 <div>
+                  {settings && (
+                    <AISettings
+                      settings={settings}
+                      admin={user.role === "admin"}
+                      busy={busy}
+                      run={run}
+                      reload={reload}
+                    />
+                  )}
                   <section className="card">
                     <h2>Verbindingen</h2>
                     <div className="connection">
                       <Sparkles size={22} />
                       <div>
-                        <strong>OpenAI API</strong>
+                        <strong>Codex</strong>
                         <p>
-                          {settings?.ai_mode === "openai"
-                            ? "API-sleutel geconfigureerd op de backend"
-                            : "Offline voorbeelden. Stel OPENAI_API_KEY in de backend in voor echte AI."}
+                          {settings?.ai_mode === "codex"
+                            ? "Lokale Codex-login · modellen instelbaar door de beheerder"
+                            : "Offline demonstratie · geen model aangeroepen"}
                         </p>
                       </div>
                       <span className="badge">
-                        {settings?.ai_mode === "openai" ? "Geconfigureerd" : "Demo"}
+                        {settings?.ai_mode === "codex" ? "Codex" : "Demo"}
                       </span>
                     </div>
                     <div className="connection">
@@ -1268,11 +1278,14 @@ export default function Home() {
                       <div>
                         <strong>Microsoft 365 / SharePoint</strong>
                         <p>
-                          Volgende fase. Vereist toegang tot de bedrijfsomgeving en goedkeuring van
-                          de Microsoft-beheerder.
+                          {settings?.office_desktop_enabled
+                            ? "Desktop Office ingeschakeld. Bewerk bestanden en importeer ze als nieuwe versie. SharePoint-sync vereist tenantconfiguratie."
+                            : "Schakel OFFICE_DESKTOP_ENABLED in op de werk-PC voor volledige bewerking in Office. SharePoint-sync volgt na tenantconfiguratie."}
                         </p>
                       </div>
-                      <span className="badge">Gepland</span>
+                      <span className="badge">
+                        {settings?.office_desktop_enabled ? "Desktop" : "Werk-PC"}
+                      </span>
                     </div>
                   </section>
                   <section className="card">
@@ -1315,7 +1328,7 @@ export default function Home() {
             <span>MERIDIAN CONSULTING</span>
             <span>
               Sampledata · Lokale PoC ·{" "}
-              {settings?.ai_mode === "openai" ? "OpenAI geconfigureerd" : "AI in demonstratiemodus"}
+              {settings?.ai_mode === "codex" ? "Codex · lokale login" : "AI in demonstratiemodus"}
             </span>
           </footer>
         </main>

@@ -16,6 +16,7 @@ import {
   History,
   BarChart3,
 } from "lucide-react";
+import { OfficeControls } from "./office-controls";
 import { api, Modal, Field, FileIcon, Empty, date } from "./ui";
 import type { Agent, ChartData, Preview, ProjectFile, Proposal, Run } from "./types";
 
@@ -121,7 +122,7 @@ export function Chart({ data }: { data: ChartData }) {
         </div>
         <a
           className="button secondary"
-          href={`/api/files/${data.file_id}/chart.png?sheet=${encodeURIComponent(data.sheet)}`}
+          href={`/api/files/${data.file_id}/chart.png?sheet=${encodeURIComponent(data.sheet)}&label_column=${data.label_column}&value_column=${data.value_column}`}
         >
           <Download size={15} /> PNG
         </a>
@@ -321,6 +322,73 @@ export function ProposalView({
   );
 }
 
+function ChartSelector({
+  file,
+  preview,
+  busy,
+  run,
+  changed,
+}: {
+  file: ProjectFile;
+  preview: Preview;
+  busy: boolean;
+  run: Run;
+  changed: (chart: ChartData) => void;
+}) {
+  const [sheet, setSheet] = useState(preview.sheets?.[0]?.name || "");
+  const [label, setLabel] = useState("0");
+  const [value, setValue] = useState("1");
+  const rows = preview.sheets?.find((s) => s.name === sheet)?.rows || [];
+  const headers = rows[0] || [];
+  return (
+    <div className="chart-selector">
+      <Field label="Werkblad">
+        <select value={sheet} onChange={(e) => setSheet(e.target.value)}>
+          {preview.sheets?.map((s) => (
+            <option key={s.name}>{s.name}</option>
+          ))}
+        </select>
+      </Field>
+      <Field label="Labels">
+        <select value={label} onChange={(e) => setLabel(e.target.value)}>
+          {headers.map((h, i) => (
+            <option value={i} key={i}>
+              {i + 1} · {String(h ?? "Kolom")}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Field label="Waarden">
+        <select value={value} onChange={(e) => setValue(e.target.value)}>
+          {headers.map((h, i) => (
+            <option value={i} key={i}>
+              {i + 1} · {String(h ?? "Kolom")}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <button
+        className="secondary"
+        disabled={busy}
+        onClick={() =>
+          run(async () =>
+            changed(
+              await api<ChartData>(
+                `/files/${file.id}/chart?sheet=${encodeURIComponent(sheet)}&label_column=${label}&value_column=${value}`,
+              ),
+            ),
+          )
+        }
+      >
+        Grafiek bijwerken
+      </button>
+      <p className="muted">
+        Maximaal 50 punten uit de eerste 200 rijen. Formules worden in Office berekend.
+      </p>
+    </div>
+  );
+}
+
 export function FilesPanel({
   pid,
   run,
@@ -426,6 +494,9 @@ export function FilesPanel({
           file_id: modal === "review" ? active?.id : null,
           agent_id: agent || null,
           chart_file_id: chartSource || null,
+          chart_sheet: chartSource === chart?.file_id ? chart.sheet : null,
+          chart_label_column: chartSource === chart?.file_id ? chart.label_column : 0,
+          chart_value_column: chartSource === chart?.file_id ? chart.value_column : 1,
         });
         setProposal(result);
       }
@@ -631,11 +702,39 @@ export function FilesPanel({
               </button>
             )}
           </div>
+          <OfficeControls
+            key={active.id}
+            file={active}
+            busy={busy}
+            run={run}
+            refresh={async () => {
+              const updated = await api<ProjectFile[]>(`/projects/${pid}/files`);
+              setFiles(updated);
+              const next = updated.find((f) => f.id === active.id);
+              if (next) await open(next);
+              await onChanged();
+            }}
+          />
           <p className="preview-note">
             Inhoudsweergave. Opmaak, afbeeldingen en formuleberekening worden hier niet volledig
             weergegeven. Download voor bewerking in Office.
           </p>
-          {chart && <Chart data={chart} />}
+          {preview.type === "xlsx" && (
+            <ChartSelector
+              key={active.id}
+              file={active}
+              preview={preview}
+              busy={busy}
+              run={run}
+              changed={setChart}
+            />
+          )}
+          {chart && (
+            <Chart
+              key={`${chart.sheet}-${chart.label_column}-${chart.value_column}`}
+              data={chart}
+            />
+          )}
           <div className="file-workspace">
             <DocumentPreview preview={preview} />
             <FileChat key={active.id} file={active} run={run} busy={busy} />

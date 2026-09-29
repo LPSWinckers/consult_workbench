@@ -22,9 +22,9 @@ Team chat is shared. AI chat starts private, with explicit sharing controlled by
 
 Models propose constrained data. Python writers generate or modify native Office files. This allows preview, validation and version checks before writes. It also makes the limits explicit: rich formatting within edited text blocks may be simplified; native Office validation remains required.
 
-## 006: Use the Responses API with configurable models
+## 006: Original API plan, superseded by local Codex
 
-The official documentation recommends Responses for new applications. Model selection can change independently of the application workflow. `OPENAI_MODEL` defaults to `gpt-6.1-sol`; document proposals use `OPENAI_COMPLEX_MODEL`, defaulting to `gpt-6-astra`. Requests set `store=False`.
+The original implementation used the Responses API with separate model defaults and `store=False`. Decision 007 supersedes that provider for this prototype. API-key configuration is no longer part of the runtime. The references below record the earlier planning research.
 
 Official references checked during planning and implementation:
 
@@ -34,3 +34,11 @@ Official references checked during planning and implementation:
 - [File input limitations](https://developers.openai.com/api/docs/guides/file-inputs)
 
 No verified DevDay 2026 release bundle was established. Model defaults depend on account availability and must be evaluated against the project's own prompts rather than treating an event name as an implementation requirement.
+
+## 007: Use local Codex for the prototype
+
+The project owner requested the integration used by `G:/t3code-main`. We inspected its structured CLI adapter and consulting workbench flow. This app follows its independent structured-generation pattern and file-context assistant flow, with stronger tool restrictions for multi-user project permissions. The frontend/backend remain Next.js and Python. Admin settings own model selection.
+
+## 008: Add native Office version import before SharePoint
+
+The project owner will run the app on a licensed work PC. Optional native editing now supplies the full installed Office applications without waiting for tenant registration. A user-specific checkout records its base version. Validated saved bytes become a new version only if that base is still current. Shared access with immutable versions remains the pilot collaboration model. SharePoint and task-pane add-ins require separate integration and acceptance checks.

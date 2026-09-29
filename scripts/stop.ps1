@@ -6,10 +6,20 @@ if (-not (Test-Path -LiteralPath $taskPidFile)) {
     exit
 }
 $taskServers = Get-Content -LiteralPath $taskPidFile -Raw | ConvertFrom-Json
+$taskProcesses = @(Get-CimInstance Win32_Process)
 foreach ($taskProcessId in @($taskServers.backend, $taskServers.frontend)) {
-    $taskProcess = Get-CimInstance Win32_Process -Filter "ProcessId = $taskProcessId" -ErrorAction SilentlyContinue
+    $taskProcess = $taskProcesses | Where-Object { $_.ProcessId -eq $taskProcessId } | Select-Object -First 1
     if ($taskProcess -and $taskProcess.CommandLine -and $taskProcess.CommandLine.Contains($taskRoot)) {
-        Stop-Process -Id $taskProcessId
+        $taskDescendants = [System.Collections.Generic.List[int]]::new()
+        $taskDescendants.Add([int]$taskProcessId)
+        for ($taskIndex = 0; $taskIndex -lt $taskDescendants.Count; $taskIndex++) {
+            foreach ($taskChild in $taskProcesses | Where-Object { $_.ParentProcessId -eq $taskDescendants[$taskIndex] }) {
+                $taskDescendants.Add([int]$taskChild.ProcessId)
+            }
+        }
+        for ($taskIndex = $taskDescendants.Count - 1; $taskIndex -ge 0; $taskIndex--) {
+            Stop-Process -Id $taskDescendants[$taskIndex] -ErrorAction SilentlyContinue
+        }
     }
 }
 Remove-Item -LiteralPath $taskPidFile

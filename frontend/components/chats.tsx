@@ -206,9 +206,9 @@ export function AIChat({
             <p className="muted">
               {mode === "demo"
                 ? "Offline demonstratie · voorbeeldantwoorden"
-                : mode === "openai"
-                  ? "OpenAI · klant- en projectcontext"
-                  : "Configureer een OpenAI API-sleutel"}
+                : mode === "codex"
+                  ? "Codex · klant- en projectcontext"
+                  : "Configureer Codex in de beheerinstellingen"}
             </p>
           </div>
           <div className="actions">

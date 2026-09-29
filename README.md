@@ -2,7 +2,7 @@
 
 A Dutch consulting workspace built with Next.js and a Python FastAPI backend. The local PoC supports customers, projects, access controls, invitation approvals, team chat, private/shared AI conversations, configurable agents, Office file versions, document proposals and Excel charts.
 
-The application works without Microsoft Office. Files stay in local storage and can be downloaded for editing elsewhere. SharePoint synchronization and the Office add-in are the next phase.
+The prototype uses local Codex login and works with sample data. On a licensed Windows work PC, it can open native Office files and import saved changes as immutable versions. SharePoint synchronization and the Office add-in remain the next phase.
 
 ## Start on Windows
 
@@ -50,19 +50,13 @@ Sample accounts and documents are created only in demo mode when the database ha
 
 New accounts require email verification. In local demo mode, signup and password recovery show an explicit development link instead of sending mail. Configure SMTP to test actual email delivery. Registration alone grants no access to existing customers or projects.
 
-## Enable OpenAI
+## Enable Codex and choose models
 
-Copy `backend/.env.example` to `backend/.env`, set `OPENAI_API_KEY`, and restart the backend. Do not put the key in the frontend. The app automatically switches from labelled offline examples to real API calls when a key is present.
+Install native Codex CLI and run `codex login` on the PC running the backend. No API key is required. Copy `backend/.env.example` to `backend/.env` and set `CODEX_BINARY` if the native executable is not on PATH. The default provider is Codex; offline examples must be explicitly selected.
 
-```dotenv
-OPENAI_API_KEY=your-key-here
-OPENAI_MODEL=gpt-6.1-sol
-OPENAI_COMPLEX_MODEL=gpt-6-astra
-```
+Administrators can change chat and document/review models under **Instellingen**, save them and test the saved chat model. Both initially use `gpt-6.1-sol`. See [Codex configuration](docs/CODEX.md) for account, model access and subprocess restrictions.
 
-The adapter uses the Responses API with `store=False`. Everyday chat and complex document proposals have separate configurable models. Their availability depends on your OpenAI account. Real API calls were not exercised during initial implementation because no API key was configured.
-
-In offline mode, document generation creates an explicit sample draft. Document review proposes no invented corrections. It asks you to configure a key for an actual language review.
+For full native Office editing, set `OFFICE_DESKTOP_ENABLED=true` on your licensed Windows work PC. Open a file in Office, save and close it, then import it as a new project version. See [work-PC setup](docs/WORK_PC.md) for conflict handling and company acceptance checks.
 
 ## Try the PoC
 
@@ -93,6 +87,8 @@ Backend dependencies are locked in `backend/requirements.lock.txt`; frontend dep
 - [Architecture](docs/ARCHITECTURE.md): modules, database, storage and AI design.
 - [Decisions](docs/DECISIONS.md): why local storage, versioning and Office integration were chosen.
 - [Roadmap](docs/ROADMAP.md): current limitations and the path to Microsoft 365.
+- [Codex](docs/CODEX.md): local login, models and request boundaries.
+- [Work-PC pilot](docs/WORK_PC.md): licensed Office setup and version import.
 - [Testing](docs/TESTING.md): automated checks and manual pilot scenarios.
 
-This PoC uses sample data. Full Office functionality is provided by Office in the later integration phase; the current browser previews are content views. They do not render full Office layouts or calculate Excel formulas.
+This PoC uses sample data. Full manual Office functionality is provided by the optional native desktop workflow; the browser previews are content views. They do not render full Office layouts or calculate Excel formulas.

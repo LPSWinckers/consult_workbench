@@ -1,4 +1,5 @@
 import io
+import math
 import json
 import os
 import re
@@ -25,8 +26,9 @@ from fastapi import (
 )
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from openpyxl.utils import get_column_letter
 
-from . import ai
+from . import ai, office
 from .db import (
     database,
     initialize,
@@ -296,11 +298,7 @@ def health():
     return {
         "ok": True,
         "storage": "local",
-        "ai": "openai"
-        if os.getenv("OPENAI_API_KEY")
-        else "demo"
-        if ai.demo_mode()
-        else "unconfigured",
+        "ai": ai.codex.configuration()["provider"],
     }
 
 
@@ -1115,7 +1113,7 @@ def ask(cid: str, body: Question, user=Depends(current_user)):
             502,
             str(exc)
             if isinstance(exc, ValueError)
-            else "AI-aanvraag mislukt. Controleer de API-configuratie en probeer opnieuw.",
+            else "AI-aanvraag mislukt. Controleer de Codex-configuratie en probeer opnieuw.",
         ) from exc
     with database() as c:
         conversation(c, cid, user)
@@ -1195,6 +1193,8 @@ class ProposalInput(BaseModel):
     agent_id: str | None = None
     chart_file_id: str | None = None
     chart_sheet: str | None = None
+    chart_label_column: int = Field(default=0, ge=0, le=1000)
+    chart_value_column: int = Field(default=1, ge=0, le=1000)
 
 
 @app.post("/api/projects/{pid}/proposals")
@@ -1227,7 +1227,14 @@ def create_proposal(pid: str, body: ProposalInput, user=Depends(current_user)):
         if body.chart_file_id:
             if selected is not None and body.chart_file_id not in selected:
                 raise HTTPException(403, "De grafiekbron valt buiten de agentreferenties")
-            chart = chart_data(c, body.chart_file_id, user, body.chart_sheet)
+            chart = chart_data(
+                c,
+                body.chart_file_id,
+                user,
+                body.chart_sheet,
+                body.chart_label_column,
+                body.chart_value_column,
+            )
             if chart["project_id"] != pid:
                 raise HTTPException(422, "Grafiekbron hoort niet bij dit project")
     try:
@@ -1353,24 +1360,33 @@ def apply_proposal(prid: str, body: dict, user=Depends(current_user)):
     return {"id": fid}
 
 
-def chart_data(c, fid, user, sheet=None):
+def chart_data(c, fid, user, sheet=None, label_column=0, value_column=1):
     f = file_row(c, fid, user)
     if not f["name"].lower().endswith(".xlsx"):
         raise HTTPException(422, "Kies een Excel-bestand")
     sheets = extract(f["name"], blob(c, f))["sheets"]
-    s = next((s for s in sheets if s["name"] == sheet), sheets[0])
+    s = (
+        next((s for s in sheets if s["name"] == sheet), None)
+        if sheet
+        else (sheets[0] if sheets else None)
+    )
+    if not s:
+        raise HTTPException(422, "Werkblad niet gevonden")
+    if not 0 <= label_column <= 1000 or not 0 <= value_column <= 1000:
+        raise HTTPException(422, "Ongeldige grafiekkolom")
     points = [
-        (str(r[0]), float(r[1]))
+        (str(r[label_column]), float(r[value_column]))
         for r in s["rows"][1:]
-        if len(r) > 1
-        and isinstance(r[1], (int, float))
-        and not isinstance(r[1], bool)
-        and r[0] is not None
+        if len(r) > max(label_column, value_column)
+        and isinstance(r[value_column], (int, float))
+        and not isinstance(r[value_column], bool)
+        and math.isfinite(r[value_column])
+        and r[label_column] is not None
     ][:50]
     if not points:
         raise HTTPException(
             422,
-            "Gebruik labels in kolom A en numerieke waarden in kolom B. Formules worden lokaal niet berekend.",
+            "Kies een labelkolom en een kolom met numerieke waarden. Formules worden lokaal niet berekend.",
         )
     return {
         "file_id": fid,
@@ -1378,22 +1394,36 @@ def chart_data(c, fid, user, sheet=None):
         "version": f["version"],
         "sheet": s["name"],
         "title": f["name"] + " · " + s["name"],
-        "range": f"A2:B{len(s['rows'])}",
+        "range": f"{get_column_letter(label_column + 1)}2:{get_column_letter(value_column + 1)}{len(s['rows'])}",
+        "label_column": label_column,
+        "value_column": value_column,
         "labels": [p[0] for p in points],
         "values": [p[1] for p in points],
     }
 
 
 @app.get("/api/files/{fid}/chart")
-def chart(fid: str, sheet: str | None = None, user=Depends(current_user)):
+def chart(
+    fid: str,
+    sheet: str | None = None,
+    label_column: int = 0,
+    value_column: int = 1,
+    user=Depends(current_user),
+):
     with database() as c:
-        return chart_data(c, fid, user, sheet)
+        return chart_data(c, fid, user, sheet, label_column, value_column)
 
 
 @app.get("/api/files/{fid}/chart.png")
-def chart_image(fid: str, sheet: str | None = None, user=Depends(current_user)):
+def chart_image(
+    fid: str,
+    sheet: str | None = None,
+    label_column: int = 0,
+    value_column: int = 1,
+    user=Depends(current_user),
+):
     with database() as c:
-        data = chart_data(c, fid, user, sheet)
+        data = chart_data(c, fid, user, sheet, label_column, value_column)
         return download_bytes(
             chart_png(data["labels"], data["values"], data["title"]),
             "analyse.png",
@@ -1406,14 +1436,131 @@ def settings(user=Depends(current_user)):
     with database() as c:
         return {
             "company": company(c),
-            "ai_mode": "openai"
-            if os.getenv("OPENAI_API_KEY")
-            else "demo"
-            if ai.demo_mode()
-            else "unconfigured",
+            "ai_mode": ai.codex.configuration()["provider"],
             "storage": "local",
             "microsoft_connected": False,
+            "office_desktop_enabled": os.getenv("OFFICE_DESKTOP_ENABLED", "false").lower()
+            == "true",
+            "ai": ai.codex.configuration(),
+            "models": ai.codex.available_models(),
         }
+
+
+@app.get("/api/files/{fid}/office")
+def office_status(fid: str, user=Depends(current_user)):
+    with database() as c:
+        file_row(c, fid, user)
+        row = c.execute(
+            "SELECT * FROM office_checkouts WHERE file_id=? AND user_id=?", (fid, user["id"])
+        ).fetchone()
+        return {
+            "enabled": office.enabled(),
+            "checked_out": bool(row),
+            "base_version": row["base_version"] if row else None,
+        }
+
+
+@app.post("/api/files/{fid}/office/open")
+def open_office(fid: str, user=Depends(current_user)):
+    if not office.enabled():
+        raise HTTPException(422, "Schakel OFFICE_DESKTOP_ENABLED in op de werk-PC")
+    with database() as c:
+        c.execute("BEGIN IMMEDIATE")
+        f = file_row(c, fid, user)
+        if f["kind"] != "file":
+            raise HTTPException(422, "Kies een Office-bestand")
+        row = c.execute(
+            "SELECT * FROM office_checkouts WHERE file_id=? AND user_id=?", (fid, user["id"])
+        ).fetchone()
+        if row and row["base_version"] != f["version"]:
+            raise HTTPException(
+                409,
+                "De werkversie is verouderd. Download je Office-kopie en upload deze bewust als nieuwe versie.",
+            )
+        if not row:
+            content = blob(c, f)
+            row = {
+                "id": uid(),
+                "file_id": fid,
+                "user_id": user["id"],
+                "base_version": f["version"],
+                "name": f["name"],
+                "digest": office.digest(content),
+            }
+            target = office.path(row)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(content)
+            c.execute("INSERT INTO office_checkouts VALUES(?,?,?,?,?,?)", tuple(row.values()))
+        target = office.path(row)
+    try:
+        office.launch(target)
+    except OSError as exc:
+        raise HTTPException(
+            502, "Office kon niet openen. Controleer de installatie en standaardapps op de werk-PC."
+        ) from exc
+    return {"message": "Bestand geopend. Sla op en sluit Office voordat je de versie importeert."}
+
+
+@app.get("/api/files/{fid}/office/download")
+def download_office_copy(fid: str, user=Depends(current_user)):
+    with database() as c:
+        file_row(c, fid, user)
+        row = c.execute(
+            "SELECT * FROM office_checkouts WHERE file_id=? AND user_id=?", (fid, user["id"])
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "Geen Office-werkkopie")
+        try:
+            content = office.path(row).read_bytes()
+        except OSError as exc:
+            raise HTTPException(
+                409, "De werkkopie is niet beschikbaar. Sluit Office en probeer opnieuw."
+            ) from exc
+        return download_bytes(content, row["name"])
+
+
+@app.post("/api/files/{fid}/office/import")
+def import_office_copy(fid: str, user=Depends(current_user)):
+    if not office.enabled():
+        raise HTTPException(422, "Desktop Office is uitgeschakeld")
+    with database() as c:
+        c.execute("BEGIN IMMEDIATE")
+        f = file_row(c, fid, user)
+        row = c.execute(
+            "SELECT * FROM office_checkouts WHERE file_id=? AND user_id=?", (fid, user["id"])
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "Open het bestand eerst in Office")
+        if row["base_version"] != f["version"]:
+            raise HTTPException(
+                409,
+                "Een collega heeft een nieuwere versie opgeslagen. Download je werkkopie en vergelijk de wijzigingen voordat je een vervangende versie uploadt.",
+            )
+        try:
+            with office.path(row).open("rb") as source:
+                content = source.read(20_000_001)
+            if len(content) > 20_000_000:
+                raise ValueError("Bestand groter dan 20 MB")
+            validate_document(row["name"], content)
+        except Exception as exc:
+            raise HTTPException(
+                422, "Sla op en sluit Office. De werkkopie is niet leesbaar of ongeldig."
+            ) from exc
+        digest = office.digest(content)
+        if digest == row["digest"]:
+            return {"version": f["version"], "message": "Geen wijzigingen om op te slaan."}
+        version = f["version"] + 1
+        c.execute(
+            "INSERT INTO versions VALUES(?,?,?,?,?)",
+            (fid, version, storage.put(content), user["id"], now()),
+        )
+        c.execute("UPDATE files SET version=? WHERE id=?", (version, fid))
+        c.execute(
+            "UPDATE office_checkouts SET base_version=?,digest=? WHERE id=?",
+            (version, digest, row["id"]),
+        )
+        audit(c, f["project_id"], user["id"], "Office-versie opgeslagen", f["name"])
+    return {"version": version, "message": f"Versie {version} opgeslagen."}
 
 
 class CompanyInput(BaseModel):
@@ -1423,6 +1570,38 @@ class CompanyInput(BaseModel):
     font: str = Field(min_length=1, max_length=60)
     tagline: str = Field(max_length=200)
     folders: list[str] = Field(min_length=1, max_length=20)
+
+
+class AISettingsInput(BaseModel):
+    provider: str = Field(pattern=r"^(codex|demo)$")
+    chat_model: str = Field(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$")
+    document_model: str = Field(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$")
+    reasoning_effort: str = Field(pattern=r"^(low|medium|high|xhigh)$")
+
+
+@app.put("/api/settings/ai")
+def configure_ai(body: AISettingsInput, user=Depends(current_user)):
+    if user["role"] != "admin":
+        raise HTTPException(403, "Alleen beheerders mogen AI-instellingen wijzigen")
+    with database() as c:
+        c.execute(
+            "INSERT INTO settings VALUES('ai', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (body.model_dump_json(),),
+        )
+    return body.model_dump()
+
+
+@app.post("/api/settings/ai/check")
+def check_ai(user=Depends(current_user)):
+    if user["role"] != "admin":
+        raise HTTPException(403, "Alleen beheerders mogen de verbinding testen")
+    if ai.codex.configuration()["provider"] != "codex":
+        raise HTTPException(422, "Selecteer en sla eerst Codex op")
+    try:
+        ai.codex.generate("Antwoord met: Verbinding werkt.", ai.codex.Answer)
+    except ValueError as exc:
+        raise HTTPException(502, str(exc)) from exc
+    return {"message": "Codex-verbinding en chatmodel werken."}
 
 
 @app.put("/api/settings/company")
